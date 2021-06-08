@@ -279,6 +279,7 @@ public class KiteLogin {
         logger.info( "2FA URL: " + curUrl ) ;
         WebElement twoFaField = webDriver.findElement( By.cssSelector("#pin") ) ;
         WebElement twoFaButton = webDriver.findElement( By.cssSelector(".button-orange")) ;
+        //  NOTE: Select by XPath was working and should work. Not sure why it stopped. Have to review and figure it out.
 //        WebElement twoFaField = webDriver.findElement( By.xpath("/html/body/div[1]/div/div[2]/div[1]/div/div/div[2]/form/div[2]/div/input") ) ;
 //        WebElement twoFaButton = webDriver.findElement( By.xpath("/html/body/div[1]/div/div[2]/div[1]/div/div/div[2]/form/div[3]/button") ) ;
         twoFaField.sendKeys( twoFactorPin ) ;
