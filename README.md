@@ -10,10 +10,8 @@ If the access token is in the text file but is no longer valid, then the same pr
 
 After successful log in, the KiteConnect object available from this class will be authorized and can be used to communicate with the Kite Connect API Servers.
 
-```
-// Create a KiteLogin object 
-KiteLogin kLogin = new KiteLogin( "KITE-USER-ID", "KITE-PASSWORD", "KITE-2FA-PIN", "API-KEY", "API-SECRET", "APP-REDIRECT-URL") ;
-
-// Get the KiteConnect object and use it
-KiteConnect kiteConnect = kLogin.getKiteConnect() ;
-```
+`// Create a KiteLogin object' 
+'KiteLogin kLogin = new KiteLogin( "KITE-USER-ID", "KITE-PASSWORD", "KITE-2FA-PIN", "API-KEY", "API-SECRET", "APP-REDIRECT-URL") ;`
+``
+`// Get the KiteConnect object and use it`
+`KiteConnect kiteConnect = kLogin.getKiteConnect() ;`
