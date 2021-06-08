@@ -179,9 +179,6 @@ public class KiteLogin {
         if ( accessToken != null )  {
             kiteConnect.setAccessToken( accessToken ) ;
             try {
-//                Routes routes = new Routes() ;
-//                KiteRequestHandler handler = new KiteRequestHandler( null ) ;
-//                handler.getRequest( routes.get("user.profile"), apiKey, accessToken ) ;
                 profile = kiteConnect.getProfile() ;
                 logger.info( "We have a existing valid session." ) ;
             }
@@ -252,16 +249,19 @@ public class KiteLogin {
      */
     private String autoWebLogin( String userId, String password,
                                  String twoFactorPin, String redirectUrl )  throws IOException {
-        String requestToken = null ;
+        String          requestToken = null ;
 
         //  Get the first log in URL.
-        String loginUrl = kiteConnect.getLoginURL() ;
+        String          loginUrl    = kiteConnect.getLoginURL() ;
         logger.info( "Login URL: " + loginUrl ) ;
 
+        //  Initialize the drivers
+        WebDriver       webDriver   = new FirefoxDriver( new FirefoxOptions().setHeadless(true) ) ;
+        WebDriverWait   waitDriver  = new WebDriverWait( webDriver, 20 ) ;
+
         //  Get the Kite Login page. Use the User ID & Password to submit the form.
-        WebDriver webDriver = new FirefoxDriver( new FirefoxOptions().setHeadless(true) ) ;
         webDriver.get( loginUrl ) ;
-        String curUrl = webDriver.getCurrentUrl() ;
+        String          curUrl      = webDriver.getCurrentUrl() ;
         logger.info( "Login Page URL: " + curUrl ) ;
         WebElement loginField = webDriver.findElement( By.id("userid") ) ;
         WebElement pwdField = webDriver.findElement( By.id("password") ) ;
@@ -271,17 +271,20 @@ public class KiteLogin {
         logger.info( "Submitting the Login Form..." ) ;
         submitButton.click() ;
         logger.info( "Submitted the Login Form..." ) ;
+        logger.info( "Waiting for Redirect to 2FA Page..." ) ;
+        waitDriver.until(ExpectedConditions.presenceOfElementLocated( By.id("pin") )) ;
 
         //  We are now in the 2FA page. Enter the PIN and submit the form.
         curUrl = webDriver.getCurrentUrl() ;
         logger.info( "2FA URL: " + curUrl ) ;
-        WebElement twoFaField = webDriver.findElement( By.xpath("/html/body/div[1]/div/div[2]/div[1]/div/div/div[2]/form/div[2]/div/input") ) ;
-        WebElement twoFaButton = webDriver.findElement( By.xpath("/html/body/div[1]/div/div[2]/div[1]/div/div/div[2]/form/div[3]/button") ) ;
+        WebElement twoFaField = webDriver.findElement( By.cssSelector("#pin") ) ;
+        WebElement twoFaButton = webDriver.findElement( By.cssSelector(".button-orange")) ;
+//        WebElement twoFaField = webDriver.findElement( By.xpath("/html/body/div[1]/div/div[2]/div[1]/div/div/div[2]/form/div[2]/div/input") ) ;
+//        WebElement twoFaButton = webDriver.findElement( By.xpath("/html/body/div[1]/div/div[2]/div[1]/div/div/div[2]/form/div[3]/button") ) ;
         twoFaField.sendKeys( twoFactorPin ) ;
         logger.info( "Submitting the 2FA Form..." ) ;
         twoFaButton.submit() ;
         logger.info( "Submitted the 2FA Form..." ) ;
-        WebDriverWait waitDriver = new WebDriverWait( webDriver, 20 ) ;
         logger.info( "Waiting for Redirect to Charanna..." ) ;
         waitDriver.until(ExpectedConditions.urlContains(redirectUrl) ) ;
         curUrl = webDriver.getCurrentUrl() ;
