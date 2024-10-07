@@ -47,7 +47,7 @@ public class KiteLogin {
     private static final String USER_ID = "KZ2053";
     private static final String PASSWORD = "Acz9340123";
     private static final String TWO_FACTOR_PIN = "O7KVRB73XBO7XBAZZD2BEQCFBTQNMOPR";
-    private static final String REDIRECT_URL = "https://localhost:8000";
+    private static final String REDIRECT_URL = "kite.zerodha.com";
 
     public KiteLogin() throws RuntimeException {
         executeKiteWebLogin(USER_ID, PASSWORD, TWO_FACTOR_PIN, API_KEY, API_SECRET, REDIRECT_URL);
