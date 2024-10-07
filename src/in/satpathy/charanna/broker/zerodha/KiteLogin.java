@@ -1,23 +1,5 @@
-/**
- * Copyright 2022 Gautam Satpathy
- *
- *  Licensed under the Apache License, Version 2.0 (the "License");
- *  you may not use this file except in compliance with the License.
- *  You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
-  */
 package in.satpathy.charanna.broker.zerodha;
 
-/*
- *  Imports
- */
 import com.zerodhatech.kiteconnect.KiteConnect;
 import com.zerodhatech.kiteconnect.kitehttp.exceptions.KiteException;
 import com.zerodhatech.models.Holding;
@@ -45,365 +27,186 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-/**
- *  <P>Log in to Zerodha's Kite Connect.</P>
- *  <P>Needs: API Key, API Secret, (Zerodha) User ID, User Password, 2FA PIN and Redirect URL.</P>
- *  <P>Will look for a text file named "access.token.txt" in the folder from which it is run.
- *  If one is found the the access_token will be read from it and a connection established.</P>
- *  <P>If the text file is not found then it will access the Kite Login URL, fill out the
- *  Web Page form with the provided User ID & Password and submit the form. The 2FA PIN will
- *  be submitted in the response page and response_token retrieved to log into Kite Connect API
- *  servers. The Access Token will be written to file for later use.</P>
- *  <P>If the access token is found in the text file but is no longer valid, then the same process
- *  will be used to automatically log in and generate a new Access Token, which will then be
- *  written to file for later use.</P>
- *
- *  <P>After successful log in, the{@link KiteConnect} object available from this class will be
- *  authorized and can be used to </P>
- *
- *  @author Gautam Satpathy
- *  @version 0.1
- *  @date 2021-06.06
- *
- */
 public class KiteLogin {
 
     static {
-        //  We need the FireFox WebDriver for Selenium
-        System.setProperty( "webdriver.gecko.driver", System.getProperty("user.dir") + File.separator + "geckodriver.exe" ) ;
+        System.setProperty("webdriver.gecko.driver", System.getProperty("user.dir") + File.separator + "geckodriver.exe");
     }
 
-    private static final Logger logger = LogManager.getLogger( KiteLogin.class ) ;
+    private static final Logger logger = LogManager.getLogger(KiteLogin.class);
 
-    //  The file where we store the Access Token.
-    private final String accessTokenFileName = System.getProperty("user.dir") + File.separator + "access.token.txt" ;
+    // The file where we store the Access Token.
+    private final String accessTokenFileName = System.getProperty("user.dir") + File.separator + "access.token.txt";
 
+    // The kite connect object
+    private KiteConnect kiteConnect;
 
-    //  The kite connect object
-    private KiteConnect             kiteConnect ;
+    // Credentials (Use your credentials here)
+    private static final String API_KEY = "ivj6b19g1zxgy3hf";
+    private static final String API_SECRET = "5k06hlqwavwxavoxr5bid32jfcg8xjbe";
+    private static final String USER_ID = "KZ2053";
+    private static final String PASSWORD = "Acz9340123";
+    private static final String TWO_FACTOR_PIN = "O7KVRB73XBO7XBAZZD2BEQCFBTQNMOPR";
+    private static final String REDIRECT_URL = "https://localhost:8000";
 
-    /**
-     *  Constructor.
-     *
-     *  @param userId
-     *  @param password
-     *  @param twoFactorPin
-     *  @param apiKey
-     *  @param apiSecret
-     *  @param redirectUrl
-     */
-    public KiteLogin( String userId, String password, String twoFactorPin,
-                      String apiKey, String apiSecret, String redirectUrl ) throws RuntimeException {
-        executeKiteWebLogin( userId, password, twoFactorPin, apiKey, apiSecret, redirectUrl ) ;
+    public KiteLogin() throws RuntimeException {
+        executeKiteWebLogin(USER_ID, PASSWORD, TWO_FACTOR_PIN, API_KEY, API_SECRET, REDIRECT_URL);
     }
 
-    /**
-     *  Logs out of KiteConnect. The access token file will be deleted.
-     *
-     *  @return false if there was a problem.
-     */
-    public boolean logout()  {
-        boolean status = false ;
-
+    public boolean logout() {
+        boolean status = false;
         try {
             JSONObject resp = kiteConnect.logout();
 
-            //  Delete the access token file.
-            new File( accessTokenFileName ).delete() ;
+            // Delete the access token file.
+            new File(accessTokenFileName).delete();
 
-            //  We are good.
-            status = true ;
+            // We are good.
+            status = true;
 
-            logger.info( resp ) ;
-            logger.info( "Logged out of Kite Connect." ) ;
-        }
-        catch (KiteException e) {
-            logger.error( "KiteException while logging out.", e ) ;
-        }
-        catch (IOException e) {
-            logger.error( "IOException while logging out.", e ) ;
+            logger.info(resp);
+            logger.info("Logged out of Kite Connect.");
+        } catch (KiteException e) {
+            logger.error("KiteException while logging out.", e);
+        } catch (IOException e) {
+            logger.error("IOException while logging out.", e);
         }
 
-        return status ;
+        return status;
     }
 
-    /**
-     *
-     *  @return
-     */
     public KiteConnect getKiteConnect() {
         return kiteConnect;
     }
 
-    /* ************************************************************************
-     *  Helper methods.
-     *************************************************************************/
+    private void executeKiteWebLogin(String userId, String password, String twoFactorPin,
+                                     String apiKey, String apiSecret, String redirectUrl) {
+        logger.info("Starting KiteConnect..");
+        String accessToken;
 
-    /**
-     *  Execute the Kite Connect login process in it's entirety.
-     */
-    private void executeKiteWebLogin( String userId, String password, String twoFactorPin,
-                                      String apiKey, String apiSecret, String redirectUrl ) {
-        logger.info( "Starting KiteConnect.." ) ;
-        String          accessToken ;
+        kiteConnect = new KiteConnect(apiKey);
+        kiteConnect.setUserId(userId);
+        kiteConnect.setSessionExpiryHook(new CharannaSessionExpiryHook());
 
-        //  Create the KiteConnect object for later use.
-        if ( userId != null && password != null && twoFactorPin != null &&
-             apiKey != null && apiSecret != null && redirectUrl != null )  {
-            kiteConnect = new KiteConnect( apiKey ) ;
-            kiteConnect.setUserId( userId ) ;
-            kiteConnect.setSessionExpiryHook( new CharannaSessionExpiryHook() ) ;
-        }
-        else {
-            throw new RuntimeException( "Don't have required data to log into Kite Connect. Cannot proceed." ) ;
-        }
+        accessToken = loadText(accessTokenFileName);
 
-        //
-        //  From here on we have a valid KiteConnect object but are not sure if we have a
-        //  valid log in active yet. We test for that and if that fails, we perform a web
-        //  login of the Kite web site using user id, password and 2FA Pin.
-        //
-
-        //  Load the access Token if it exists.
-        accessToken = loadText( accessTokenFileName ) ;
-
-        // Check if we already have a valid session, that is, we have a access_token that is valid.
-        Profile profile = null ;
-        if ( accessToken != null )  {
-            kiteConnect.setAccessToken( accessToken ) ;
+        Profile profile = null;
+        if (accessToken != null) {
+            kiteConnect.setAccessToken(accessToken);
             try {
-                profile = kiteConnect.getProfile() ;
-                logger.info( "We have a existing valid session." ) ;
-            }
-            catch (IOException e) {
-                logger.error( "IOException trying to get Profile to test for valid session.", e ) ;
-            }
-            catch (KiteException e) {
-                logger.error( "KiteException trying to get Profile to test for valid session.", e ) ;
+                profile = kiteConnect.getProfile();
+                logger.info("We have an existing valid session.");
+            } catch (IOException | KiteException e) {
+                logger.error("Exception trying to get Profile to test for valid session.", e);
             }
         }
 
-        if ( profile == null )  {
-            //  We don't have a valid session. Login.
+        if (profile == null) {
             try {
-                String requestToken = autoWebLogin( userId, password, twoFactorPin, redirectUrl ) ;
+                String requestToken = autoWebLogin(userId, password, twoFactorPin, redirectUrl);
 
-                //  Start the User Session and get a User object.
-                //  This will set the Access Token in the KiteConnect object.
-                User user = getUserWithSession( requestToken, apiSecret ) ;
-                logger.info( "[User] User Name: " + user.userName +
-                        ", User ID: " + user.userId +
-                        ", Login Time: " + user.loginTime +
-                        ", Access Token: " + user.accessToken +
-                        ", API Key: " + user.apiKey +
-                        ", Public Token: " + user.publicToken +
-                        ", Refresh Token: " + user.refreshToken +
-                        ", Order Types: " + user.orderTypes +
-                        ", Products: " + user.products +
-                        ", Short Name: " + user.shortName +
-                        ", User Type: " + user.userType
-                ) ;
+                User user = getUserWithSession(requestToken, apiSecret);
+                accessToken = user.accessToken;
+                kiteConnect.setAccessToken(accessToken);
+                kiteConnect.setPublicToken(user.publicToken);
 
-                //  Extract the details from the User object for later use.
-                accessToken = user.accessToken ;
-                kiteConnect.setAccessToken( accessToken ) ;
-                kiteConnect.setPublicToken( user.publicToken ) ;
+                profile = kiteConnect.getProfile();
+                logger.info("Profile: " + profile.userName + ", " + profile.userShortname);
 
-                //  Get the User Profile
-                profile = kiteConnect.getProfile() ;
-                logger.info( "[Profile] User Name: " + profile.userName +
-                        ", Short Name: " + profile.userShortname +
-                        ", User Type: " + profile.userType +
-                        ", Email: " + profile.email +
-                        ", Avatar: " + profile.avatarURL +
-                        ", Broker: " + profile.broker +
-                        ", Email: " + profile.email +
-                        ", Exchanges: " + profile.exchanges +
-                        ", Order Tpes: " + profile.orderTypes +
-                        ", Products: " + profile.products ) ;
-
-                //  Write the Access Token for later use.
-                saveText( accessToken, accessTokenFileName ) ;
-            }
-            catch (IOException e) {
-                logger.error( "IOException trying to get execute Kite Login.", e ) ;
-                kiteConnect = null ;
-            }
-            catch (KiteException e) {
-                logger.error( "KiteException trying to get execute Kite Login.", e ) ;
+                saveText(accessToken, accessTokenFileName);
+            } catch (IOException | KiteException e) {
+                logger.error("Exception during Kite Login.", e);
+                kiteConnect = null;
             }
         }
     }
 
-    /**
-     *  Execute the automatic web login process and retrieve the request_token.
-     *
-     *  @return the request_token or null if there was an error
-     */
-    private String autoWebLogin( String userId, String password,
-                                 String twoFactorPin, String redirectUrl )  throws IOException {
-        String          requestToken = null ;
+    private String autoWebLogin(String userId, String password, String twoFactorPin, String redirectUrl) throws IOException {
+        String requestToken = null;
 
-        //  Get the first log in URL.
-        String          loginUrl    = kiteConnect.getLoginURL() ;
-        logger.info( "Login URL: " + loginUrl ) ;
+        String loginUrl = kiteConnect.getLoginURL();
+        logger.info("Login URL: " + loginUrl);
 
-        //  Initialize the drivers
-        WebDriver       webDriver   = new FirefoxDriver( new FirefoxOptions().setHeadless(true) ) ;
-        WebDriverWait   waitDriver  = new WebDriverWait( webDriver, 20 ) ;
+        WebDriver webDriver = new FirefoxDriver(new FirefoxOptions().setHeadless(true));
+        WebDriverWait waitDriver = new WebDriverWait(webDriver, 20);
 
-        //  Get the Kite Login page. Use the User ID & Password to submit the form.
-        webDriver.get( loginUrl ) ;
-        String          curUrl      = webDriver.getCurrentUrl() ;
-        logger.info( "Login Page URL: " + curUrl ) ;
-        WebElement loginField = webDriver.findElement( By.id("userid") ) ;
-        WebElement pwdField = webDriver.findElement( By.id("password") ) ;
-        WebElement submitButton = webDriver.findElement( By.xpath("/html/body/div[1]/div/div[2]/div[1]/div/div/div[2]/form/div[4]/button") ) ;
-        loginField.sendKeys( userId ) ;
-        pwdField.sendKeys( password ) ;
-        logger.info( "Submitting the Login Form..." ) ;
-        submitButton.click() ;
-        logger.info( "Submitted the Login Form..." ) ;
-        logger.info( "Waiting for Redirect to 2FA Page..." ) ;
-        waitDriver.until(ExpectedConditions.presenceOfElementLocated( By.id("pin") )) ;
+        webDriver.get(loginUrl);
+        WebElement loginField = webDriver.findElement(By.id("userid"));
+        WebElement pwdField = webDriver.findElement(By.id("password"));
+        WebElement submitButton = webDriver.findElement(By.xpath("/html/body/div[1]/div/div[2]/div[1]/div/div/div[2]/form/div[4]/button"));
+        loginField.sendKeys(userId);
+        pwdField.sendKeys(password);
+        submitButton.click();
 
-        //  We are now in the 2FA page. Enter the PIN and submit the form.
-        curUrl = webDriver.getCurrentUrl() ;
-        logger.info( "2FA URL: " + curUrl ) ;
-        WebElement twoFaField = webDriver.findElement( By.cssSelector("#pin") ) ;
-        WebElement twoFaButton = webDriver.findElement( By.cssSelector(".button-orange")) ;
-        //  NOTE: Select by XPath was working and should work. Not sure why it stopped. Have to review and figure it out.
-//        WebElement twoFaField = webDriver.findElement( By.xpath("/html/body/div[1]/div/div[2]/div[1]/div/div/div[2]/form/div[2]/div/input") ) ;
-//        WebElement twoFaButton = webDriver.findElement( By.xpath("/html/body/div[1]/div/div[2]/div[1]/div/div/div[2]/form/div[3]/button") ) ;
-        twoFaField.sendKeys( twoFactorPin ) ;
-        logger.info( "Submitting the 2FA Form..." ) ;
-        twoFaButton.submit() ;
-        logger.info( "Submitted the 2FA Form..." ) ;
-        logger.info( "Waiting for Redirect to Charanna..." ) ;
-        waitDriver.until(ExpectedConditions.urlContains(redirectUrl) ) ;
-        curUrl = webDriver.getCurrentUrl() ;
-        logger.info( "Final URL: " + curUrl ) ;
-        if ( curUrl.contains(redirectUrl) ) {
-            URL url = new URL( curUrl ) ;
+        waitDriver.until(ExpectedConditions.presenceOfElementLocated(By.id("pin")));
+
+        WebElement twoFaField = webDriver.findElement(By.cssSelector("#pin"));
+        WebElement twoFaButton = webDriver.findElement(By.cssSelector(".button-orange"));
+        twoFaField.sendKeys(twoFactorPin);
+        twoFaButton.submit();
+
+        waitDriver.until(ExpectedConditions.urlContains(redirectUrl));
+        String curUrl = webDriver.getCurrentUrl();
+        if (curUrl.contains(redirectUrl)) {
+            URL url = new URL(curUrl);
             Map<String, String> query_pairs = new HashMap<>();
             String query = url.getQuery();
-            String[] pairs = query.split( "&" ) ;
-            for ( String pair : pairs ) {
-                int idx = pair.indexOf( "=" ) ;
-                query_pairs.put( URLDecoder.decode(pair.substring(0, idx), StandardCharsets.UTF_8),
-                                 URLDecoder.decode(pair.substring(idx + 1), StandardCharsets.UTF_8) ) ;
+            String[] pairs = query.split("&");
+            for (String pair : pairs) {
+                int idx = pair.indexOf("=");
+                query_pairs.put(URLDecoder.decode(pair.substring(0, idx), StandardCharsets.UTF_8),
+                        URLDecoder.decode(pair.substring(idx + 1), StandardCharsets.UTF_8));
             }
-            requestToken = query_pairs.get( "request_token" ) ;
-            logger.info( "Found Request Token - " + requestToken) ;
+            requestToken = query_pairs.get("request_token");
         }
 
-        return requestToken ;
+        return requestToken;
     }
 
-    /**
-     *  Generates a new User Session with the specified request_token.
-     *
-     *  @param requestToken
-     *  @return
-     */
-    private User getUserWithSession( String requestToken, String apiSecret  ) throws KiteException, IOException {
-        return kiteConnect.generateSession( requestToken, apiSecret ) ;
+    private User getUserWithSession(String requestToken, String apiSecret) throws KiteException, IOException {
+        return kiteConnect.generateSession(requestToken, apiSecret);
     }
 
-    /**
-     *  Load a file and return as String
-     *
-     *  @param fileName
-     *  @return null if there was a problem
-     */
-    private String loadText( String fileName )   {
-        String          returnString    = null ;
-
+    private String loadText(String fileName) {
+        String returnString = null;
         try {
-            byte[] bytes = Files.readAllBytes( new File(fileName).toPath() ) ;
-            returnString = new String( bytes ) ;
+            byte[] bytes = Files.readAllBytes(new File(fileName).toPath());
+            returnString = new String(bytes);
+        } catch (IOException e) {
+            logger.error("IOException loading text from file.", e);
         }
-        catch ( IOException e ) {
-            logger.error( "IOException loading text from file.", e );
-        }
-
-        return returnString ;
+        return returnString;
     }
 
-    /**
-     *  Load a file and return as String
-     *
-     *  @param fileName
-     *  @return null if there was a problem
-     */
-    private void saveText( String text, String fileName )   {
-        FileWriter writer = null ;
-
-        try {
-            writer = new FileWriter( fileName ) ;
-            writer.write( text ) ;
-        }
-        catch ( IOException e ) {
-            logger.error( "Opps! Problem writing to file. Check what you gave me!", e ) ;
-            e.printStackTrace() ;
-        }
-        finally {
-            if ( writer != null ) {
-                try {
-                    writer.close() ;
-                }
-                catch ( IOException e ) {
-                    e.printStackTrace() ;
-                }
-            }
+    private void saveText(String text, String fileName) {
+        try (FileWriter writer = new FileWriter(fileName)) {
+            writer.write(text);
+        } catch (IOException e) {
+            logger.error("Problem writing to file.", e);
         }
     }
 
-    /**
-     *  TEST!
-     *
-     *  @param args
-     */
-    public static void main( String[] args )    {
-        KiteLogin test = new KiteLogin(
-                        "KITE-USER-ID", "KITE-PASSWORD", "KITE-2FA-PIN",
-                              "API-KEY", "API-SECRET",
-                              "APP-REDIRECT-URL") ;
-
-        KiteConnect kiteConnect = test.getKiteConnect() ;
-        List<Holding> holdings = null;
+    public static void main(String[] args) {
+        KiteLogin test = new KiteLogin();
+        KiteConnect kiteConnect = test.getKiteConnect();
+        List<Holding> holdings;
         try {
             holdings = kiteConnect.getHoldings();
-        }
-        catch (KiteException e) {
-            e.printStackTrace();
-        }
-        catch (IOException e) {
-            e.printStackTrace();
-        }
-
-        for ( Holding holding : holdings )  {
-            logger.info( "[Holding] Account Id: " + holding.accountId +
+            for (Holding holding : holdings) {
+                logger.info("[Holding] Account Id: " + holding.accountId +
                         ", Exchange: " + holding.exchange +
                         ", Instrument Token: " + holding.instrumentToken +
                         ", Trading Symbol: " + holding.tradingSymbol +
                         ", ISIN: " + holding.isin +
                         ", Product: " + holding.product +
-                        ", Collateral Quantity: " + holding.collateralQuantity +
-                        ", Collateral Type: " + holding.collateraltype +
                         ", Quantity: " + holding.quantity +
-                        ", Price: " + holding.price +
-                        ", Average Price: " + holding.averagePrice +
-                        ", Last Price: " + holding.lastPrice +
-                        ", Realized Quantity: " + holding.realisedQuantity +
-                        ", T1 Quantity: " + holding.t1Quantity +
-                        ", P/L: " + holding.pnl
-
-            ) ;
+                        ", P/L: " + holding.pnl);
+            }
+        } catch (KiteException | IOException e) {
+            e.printStackTrace();
         }
 
-        //  Logout this time and retest.
-//        test.logout();
+        // Logout after test
+        // test.logout();
     }
-
-}   /*  End of the KiteLogin class. */
+}
