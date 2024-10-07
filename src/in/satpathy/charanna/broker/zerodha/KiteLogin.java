@@ -203,8 +203,5 @@ public class KiteLogin {
         } catch (KiteException | IOException e) {
             e.printStackTrace();
         }
-
-        // Logout after test
-        // test.logout();
     }
 }
